@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { parseRupeesToPaise } from "@/lib/money";
-import { localNow } from "@/lib/occurrences";
+import { addDays, localNow, normalizeTime } from "@/lib/occurrences";
 import { getActiveStudent, unwrap } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -243,6 +243,92 @@ export async function createSetup(formData: FormData) {
           weekday,
           start_time: startTime,
           active_from: activeFrom,
+        })),
+      )
+      .select("id"),
+  );
+
+  revalidatePath("/");
+}
+
+// Closes the rules in force and opens new ones, rather than editing in place,
+// so classes before the change still derive from the rule that applied then.
+export async function changeSchedule(formData: FormData) {
+  const student = await requireStudent();
+  const supabase = await createClient();
+
+  const startTime = normalizeTime(String(formData.get("startTime") || "15:00"));
+  const weekdays = [
+    ...new Set(formData.getAll("weekdays").map(Number)),
+  ].sort((a, b) => a - b);
+  const from =
+    String(formData.get("from") || "") ||
+    localNow(new Date(), student.timezone).date;
+
+  if (weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+    throw new Error("Bad weekday");
+  }
+  if (weekdays.length === 0) throw new Error("Pick at least one day");
+
+  const current = unwrap(
+    await supabase
+      .from("schedules")
+      .select("*")
+      .eq("student_id", student.id)
+      .is("active_until", null),
+  );
+
+  const unchanged =
+    current.length === weekdays.length &&
+    current.every(
+      (rule) =>
+        weekdays.includes(rule.weekday) &&
+        normalizeTime(rule.start_time) === startTime,
+    );
+  if (unchanged) return;
+
+  // Rules that already governed a date get closed the day before the new ones
+  // start. Rules that never governed anything, from changing the schedule
+  // twice in one day, are deleted instead: closing them would leave
+  // active_until before active_from, which the schema rejects.
+  const toClose = current.filter((rule) => rule.active_from < from);
+  const toDelete = current.filter((rule) => rule.active_from >= from);
+
+  if (toClose.length) {
+    unwrap(
+      await supabase
+        .from("schedules")
+        .update({ active_until: addDays(from, -1) })
+        .in(
+          "id",
+          toClose.map((rule) => rule.id),
+        )
+        .select("id"),
+    );
+  }
+
+  if (toDelete.length) {
+    unwrap(
+      await supabase
+        .from("schedules")
+        .delete()
+        .in(
+          "id",
+          toDelete.map((rule) => rule.id),
+        )
+        .select("id"),
+    );
+  }
+
+  unwrap(
+    await supabase
+      .from("schedules")
+      .insert(
+        weekdays.map((weekday) => ({
+          student_id: student.id,
+          weekday,
+          start_time: startTime,
+          active_from: from,
         })),
       )
       .select("id"),

@@ -8,11 +8,12 @@ import { buttonStyles, Card, Empty } from "./ui";
 
 export function SessionLog({ sessions }: { sessions: SessionRow[] }) {
   return (
-    <Card title="Log">
+    <Card title="Log" className="min-[900px]:flex min-[900px]:min-h-0 min-[900px]:w-full min-[900px]:flex-col">
       {sessions.length === 0 ? (
         <Empty>No classes logged yet.</Empty>
       ) : (
-        <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+        // Scrolls inside the card on desktop so the heading stays put.
+        <ul className="divide-y divide-neutral-100 min-[900px]:min-h-0 min-[900px]:flex-1 min-[900px]:overflow-y-auto dark:divide-neutral-800">
           {sessions.map((session) => {
             const cancelled = session.status === "cancelled";
 

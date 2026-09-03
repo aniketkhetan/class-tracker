@@ -3,14 +3,18 @@ import type { ReactNode } from "react";
 export function Card({
   title,
   action,
+  className = "",
   children,
 }: {
   title?: string;
   action?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <section
+      className={`rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 ${className}`}
+    >
       {(title || action) && (
         <header className="mb-3 flex items-baseline justify-between gap-3">
           {title && (

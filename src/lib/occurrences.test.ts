@@ -196,3 +196,51 @@ describe("derivePending", () => {
     expect(pending).toEqual([]);
   });
 });
+
+// The shape changeSchedule writes: the old rule closed the day before the new
+// one opens.
+describe("a schedule change at the boundary", () => {
+  const versioned: ScheduleRule[] = [
+    rule({
+      id: 1,
+      weekday: TUE,
+      startTime: "15:00",
+      activeFrom: "2026-08-01",
+      activeUntil: "2026-08-17",
+    }),
+    rule({
+      id: 2,
+      weekday: TUE,
+      startTime: "17:00",
+      activeFrom: "2026-08-18",
+    }),
+  ];
+
+  it("uses the new time on the changeover day, not the old one", () => {
+    // 16:15 IST on Tuesday the 18th. The old 15:00 has passed but no longer
+    // applies, and the new 17:00 has not arrived.
+    const pending = derivePending({
+      schedules: versioned,
+      resolvedDates: [],
+      now: new Date("2026-08-18T10:45:00Z"),
+      timeZone: IST,
+    });
+
+    expect(datesOf(pending)).toEqual(["2026-08-11", "2026-08-04"]);
+  });
+
+  it("picks the changeover day up once the new time passes", () => {
+    const pending = derivePending({
+      schedules: versioned,
+      resolvedDates: [],
+      now: new Date("2026-08-18T12:00:00Z"),
+      timeZone: IST,
+    });
+
+    expect(datesOf(pending)).toEqual([
+      "2026-08-18",
+      "2026-08-11",
+      "2026-08-04",
+    ]);
+  });
+});
