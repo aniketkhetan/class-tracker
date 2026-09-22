@@ -5,6 +5,7 @@ export type SessionStatus = "confirmed" | "cancelled";
 
 export type StudentRow = {
   id: number;
+  owner_id: string;
   name: string;
   rate_paise: number;
   timezone: string;
@@ -45,6 +46,7 @@ export type PaymentRow = {
 
 export type PushSubscriptionRow = {
   id: number;
+  owner_id: string;
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -120,10 +122,46 @@ export type Database = {
       };
     };
     Functions: {
-      is_allowed: {
-        Args: Record<string, never>;
-        Returns: boolean;
+      is_allowed: { Args: Record<string, never>; Returns: boolean };
+      owns_student: { Args: { p_student_id: number }; Returns: boolean };
+      create_setup: {
+        Args: {
+          p_name: string;
+          p_rate_paise: number;
+          p_timezone: string;
+          p_weekdays: number[];
+          p_start_time: string;
+          p_from: string;
+        };
+        Returns: number;
       };
+      change_schedule: {
+        Args: {
+          p_student_id: number;
+          p_weekdays: number[];
+          p_start_time: string;
+          p_from: string;
+        };
+        Returns: undefined;
+      };
+      resolve_class: {
+        Args: {
+          p_student_id: number;
+          p_schedule_id: number | null;
+          p_date: string;
+          p_status: SessionStatus;
+        };
+        Returns: undefined;
+      };
+      resolve_many: {
+        Args: {
+          p_student_id: number;
+          p_rows: { date: string; scheduleId: number | null }[];
+          p_status: SessionStatus;
+        };
+        Returns: number;
+      };
+      toggle_session: { Args: { p_session_id: number }; Returns: undefined };
     };
     Enums: { session_status: SessionStatus };
     CompositeTypes: Record<string, never>;

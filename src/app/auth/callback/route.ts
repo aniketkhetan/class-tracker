@@ -6,8 +6,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
 
-  // Behind Vercel's proxy the origin is the internal host, so redirect to the
-  // forwarded one.
+
   const forwardedHost = request.headers.get("x-forwarded-host");
   const base =
     process.env.NODE_ENV === "development" || !forwardedHost

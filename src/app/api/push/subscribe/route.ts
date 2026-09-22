@@ -17,9 +17,22 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  }
+
+  // Endpoints are unique across the whole table, so a device that re-subscribes
+  // under a different account moves to that owner rather than being duplicated.
   const { error } = await supabase
     .from("push_subscriptions")
-    .upsert({ endpoint, p256dh, auth }, { onConflict: "endpoint" });
+    .upsert(
+      { endpoint, p256dh, auth, owner_id: user.id },
+      { onConflict: "endpoint" },
+    );
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

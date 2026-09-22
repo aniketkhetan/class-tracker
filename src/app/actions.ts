@@ -2,13 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { SessionStatus } from "@/lib/database.types";
 import { parseRupeesToPaise } from "@/lib/money";
-import { addDays, localNow, normalizeTime } from "@/lib/occurrences";
+import { localNow, normalizeTime } from "@/lib/occurrences";
 import { getActiveStudent, unwrap } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
-
-// Postgres unique violation. A double tap is a no-op, not an error.
-const UNIQUE_VIOLATION = "23505";
 
 async function requireStudent() {
   const student = await getActiveStudent();
@@ -16,74 +14,59 @@ async function requireStudent() {
   return student;
 }
 
-export async function confirmClass(formData: FormData) {
-  const date = String(formData.get("date"));
+// An RPC returns { data, error } like anything else, but a raise inside the
+// function surfaces as an error rather than a partial write.
+function check(error: { message: string } | null) {
+  if (error) throw new Error(error.message);
+}
+
+async function resolve(formData: FormData, status: SessionStatus) {
   const scheduleIdRaw = formData.get("scheduleId");
   const student = await requireStudent();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("sessions").insert({
-    student_id: student.id,
-    schedule_id: scheduleIdRaw ? Number(scheduleIdRaw) : null,
-    date,
-    status: "confirmed",
-    rate_paise: student.rate_paise,
+  const { error } = await supabase.rpc("resolve_class", {
+    p_student_id: student.id,
+    p_schedule_id: scheduleIdRaw ? Number(scheduleIdRaw) : null,
+    p_date: String(formData.get("date")),
+    p_status: status,
   });
 
-  if (error && error.code !== UNIQUE_VIOLATION) throw new Error(error.message);
-
+  check(error);
   revalidatePath("/");
+}
+
+export async function confirmClass(formData: FormData) {
+  await resolve(formData, "confirmed");
 }
 
 export async function cancelClass(formData: FormData) {
-  const date = String(formData.get("date"));
-  const scheduleIdRaw = formData.get("scheduleId");
-  const student = await requireStudent();
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("sessions").insert({
-    student_id: student.id,
-    schedule_id: scheduleIdRaw ? Number(scheduleIdRaw) : null,
-    date,
-    status: "cancelled",
-    rate_paise: null,
-  });
-
-  if (error && error.code !== UNIQUE_VIOLATION) throw new Error(error.message);
-
-  revalidatePath("/");
+  await resolve(formData, "cancelled");
 }
 
-// Clears a whole backlog in one go.
+// Clears a whole backlog in one transaction, so it all lands or none of it does.
 export async function confirmAll(formData: FormData) {
-  const payload = String(formData.get("occurrences") ?? "[]");
-  const occurrences = JSON.parse(payload) as {
+  const rows = JSON.parse(String(formData.get("occurrences") ?? "[]")) as {
     date: string;
     scheduleId: number | null;
   }[];
-  if (occurrences.length === 0) return;
+  if (rows.length === 0) return;
 
   const student = await requireStudent();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("sessions").insert(
-    occurrences.map((o) => ({
-      student_id: student.id,
-      schedule_id: o.scheduleId,
-      date: o.date,
-      status: "confirmed" as const,
-      rate_paise: student.rate_paise,
-    })),
-  );
+  const { error } = await supabase.rpc("resolve_many", {
+    p_student_id: student.id,
+    p_rows: rows,
+    p_status: "confirmed",
+  });
 
-  if (error && error.code !== UNIQUE_VIOLATION) throw new Error(error.message);
-
+  check(error);
   revalidatePath("/");
 }
 
 // Saved separately from the confirmation, which has already happened by now.
 export async function saveNotes(formData: FormData) {
-  const sessionId = Number(formData.get("sessionId"));
   const notes = String(formData.get("notes") ?? "").trim();
   const supabase = await createClient();
 
@@ -91,7 +74,7 @@ export async function saveNotes(formData: FormData) {
     await supabase
       .from("sessions")
       .update({ notes: notes || null })
-      .eq("id", sessionId)
+      .eq("id", Number(formData.get("sessionId")))
       .select("id"),
   );
 
@@ -102,66 +85,42 @@ export async function saveNotes(formData: FormData) {
 export async function addAdHocClass(formData: FormData) {
   const student = await requireStudent();
   const supabase = await createClient();
-  const date =
-    String(formData.get("date") ?? "") ||
-    localNow(new Date(), student.timezone).date;
-  const notes = String(formData.get("notes") ?? "").trim();
 
-  unwrap(
-    await supabase
-      .from("sessions")
-      .insert({
-        student_id: student.id,
-        schedule_id: null,
-        date,
-        status: "confirmed",
-        rate_paise: student.rate_paise,
-        notes: notes || null,
-      })
-      .select("id"),
-  );
+  const { error } = await supabase.rpc("resolve_class", {
+    p_student_id: student.id,
+    p_schedule_id: null,
+    p_date:
+      String(formData.get("date") ?? "") ||
+      localNow(new Date(), student.timezone).date,
+    p_status: "confirmed",
+  });
 
+  check(error);
   revalidatePath("/");
 }
 
-// For fixing a misclick.
+// For fixing a misclick. One statement, so two tabs cannot both flip it.
 export async function toggleSessionStatus(formData: FormData) {
-  const sessionId = Number(formData.get("sessionId"));
-  const student = await requireStudent();
   const supabase = await createClient();
 
-  const current = unwrap(
-    await supabase
-      .from("sessions")
-      .select("status")
-      .eq("id", sessionId)
-      .single(),
-  );
+  const { error } = await supabase.rpc("toggle_session", {
+    p_session_id: Number(formData.get("sessionId")),
+  });
 
-  const nextStatus =
-    current.status === "confirmed" ? ("cancelled" as const) : ("confirmed" as const);
-
-  unwrap(
-    await supabase
-      .from("sessions")
-      .update({
-        status: nextStatus,
-        rate_paise: nextStatus === "confirmed" ? student.rate_paise : null,
-      })
-      .eq("id", sessionId)
-      .select("id"),
-  );
-
+  check(error);
   revalidatePath("/");
 }
 
 // Puts the date back in the pending queue.
 export async function deleteSession(formData: FormData) {
-  const sessionId = Number(formData.get("sessionId"));
   const supabase = await createClient();
 
   unwrap(
-    await supabase.from("sessions").delete().eq("id", sessionId).select("id"),
+    await supabase
+      .from("sessions")
+      .delete()
+      .eq("id", Number(formData.get("sessionId")))
+      .select("id"),
   );
 
   revalidatePath("/");
@@ -175,9 +134,6 @@ export async function recordPayment(formData: FormData) {
     throw new Error("Payment amount must be a positive number");
   }
 
-  const date =
-    String(formData.get("date") ?? "") ||
-    localNow(new Date(), student.timezone).date;
   const note = String(formData.get("note") ?? "").trim();
 
   unwrap(
@@ -185,7 +141,9 @@ export async function recordPayment(formData: FormData) {
       .from("payments")
       .insert({
         student_id: student.id,
-        date,
+        date:
+          String(formData.get("date") ?? "") ||
+          localNow(new Date(), student.timezone).date,
         amount_paise: amountPaise,
         note: note || null,
       })
@@ -196,58 +154,53 @@ export async function recordPayment(formData: FormData) {
 }
 
 export async function deletePayment(formData: FormData) {
-  const paymentId = Number(formData.get("paymentId"));
   const supabase = await createClient();
 
   unwrap(
-    await supabase.from("payments").delete().eq("id", paymentId).select("id"),
+    await supabase
+      .from("payments")
+      .delete()
+      .eq("id", Number(formData.get("paymentId")))
+      .select("id"),
   );
 
   revalidatePath("/");
 }
 
-// First run: student, rate, weekly slots.
+function readWeekdays(formData: FormData): number[] {
+  const weekdays = [...new Set(formData.getAll("weekdays").map(Number))].sort(
+    (a, b) => a - b,
+  );
+  if (weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+    throw new Error("Bad weekday");
+  }
+  if (weekdays.length === 0) throw new Error("Pick at least one day");
+  return weekdays;
+}
+
+// First run: student, rate, weekly slots. One transaction, so a failure part
+// way through cannot leave a student with no schedule.
 export async function createSetup(formData: FormData) {
   const supabase = await createClient();
   const name = String(formData.get("name") ?? "").trim();
   const ratePaise = parseRupeesToPaise(String(formData.get("rupees") ?? ""));
   const timezone = String(formData.get("timezone") ?? "Asia/Kolkata");
-  const startTime = String(formData.get("startTime") ?? "15:00");
-  const weekdays = formData
-    .getAll("weekdays")
-    .map(Number)
-    .filter((d) => d >= 0 && d <= 6);
 
   if (!name) throw new Error("Name is required");
   if (ratePaise === null || ratePaise <= 0) {
     throw new Error("Rate must be a positive number");
   }
-  if (weekdays.length === 0) throw new Error("Pick at least one day");
 
-  const student = unwrap(
-    await supabase
-      .from("students")
-      .insert({ name, rate_paise: ratePaise, timezone })
-      .select("*")
-      .single(),
-  );
+  const { error } = await supabase.rpc("create_setup", {
+    p_name: name,
+    p_rate_paise: ratePaise,
+    p_timezone: timezone,
+    p_weekdays: readWeekdays(formData),
+    p_start_time: normalizeTime(String(formData.get("startTime") || "15:00")),
+    p_from: localNow(new Date(), timezone).date,
+  });
 
-  const activeFrom = localNow(new Date(), timezone).date;
-
-  unwrap(
-    await supabase
-      .from("schedules")
-      .insert(
-        weekdays.map((weekday) => ({
-          student_id: student.id,
-          weekday,
-          start_time: startTime,
-          active_from: activeFrom,
-        })),
-      )
-      .select("id"),
-  );
-
+  check(error);
   revalidatePath("/");
 }
 
@@ -257,82 +210,15 @@ export async function changeSchedule(formData: FormData) {
   const student = await requireStudent();
   const supabase = await createClient();
 
-  const startTime = normalizeTime(String(formData.get("startTime") || "15:00"));
-  const weekdays = [
-    ...new Set(formData.getAll("weekdays").map(Number)),
-  ].sort((a, b) => a - b);
-  const from =
-    String(formData.get("from") || "") ||
-    localNow(new Date(), student.timezone).date;
+  const { error } = await supabase.rpc("change_schedule", {
+    p_student_id: student.id,
+    p_weekdays: readWeekdays(formData),
+    p_start_time: normalizeTime(String(formData.get("startTime") || "15:00")),
+    p_from:
+      String(formData.get("from") || "") ||
+      localNow(new Date(), student.timezone).date,
+  });
 
-  if (weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
-    throw new Error("Bad weekday");
-  }
-  if (weekdays.length === 0) throw new Error("Pick at least one day");
-
-  const current = unwrap(
-    await supabase
-      .from("schedules")
-      .select("*")
-      .eq("student_id", student.id)
-      .is("active_until", null),
-  );
-
-  const unchanged =
-    current.length === weekdays.length &&
-    current.every(
-      (rule) =>
-        weekdays.includes(rule.weekday) &&
-        normalizeTime(rule.start_time) === startTime,
-    );
-  if (unchanged) return;
-
-  // Rules that already governed a date get closed the day before the new ones
-  // start. Rules that never governed anything, from changing the schedule
-  // twice in one day, are deleted instead: closing them would leave
-  // active_until before active_from, which the schema rejects.
-  const toClose = current.filter((rule) => rule.active_from < from);
-  const toDelete = current.filter((rule) => rule.active_from >= from);
-
-  if (toClose.length) {
-    unwrap(
-      await supabase
-        .from("schedules")
-        .update({ active_until: addDays(from, -1) })
-        .in(
-          "id",
-          toClose.map((rule) => rule.id),
-        )
-        .select("id"),
-    );
-  }
-
-  if (toDelete.length) {
-    unwrap(
-      await supabase
-        .from("schedules")
-        .delete()
-        .in(
-          "id",
-          toDelete.map((rule) => rule.id),
-        )
-        .select("id"),
-    );
-  }
-
-  unwrap(
-    await supabase
-      .from("schedules")
-      .insert(
-        weekdays.map((weekday) => ({
-          student_id: student.id,
-          weekday,
-          start_time: startTime,
-          active_from: from,
-        })),
-      )
-      .select("id"),
-  );
-
+  check(error);
   revalidatePath("/");
 }
