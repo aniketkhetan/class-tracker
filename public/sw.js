@@ -7,6 +7,9 @@ self.addEventListener("activate", (event) =>
   event.waitUntil(self.clients.claim()),
 );
 
+
+self.addEventListener("fetch", () => {});
+
 async function setBadge(count) {
   if (typeof count !== "number" || !self.navigator.setAppBadge) return;
   if (count > 0) await self.navigator.setAppBadge(count);
