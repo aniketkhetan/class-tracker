@@ -25,7 +25,14 @@ self.addEventListener("push", (event) => {
     }
   })();
 
-  const { title = "Class tracker", body = "", pending, date, scheduleId } = payload;
+  const {
+    title = "Class tracker",
+    body = "",
+    pending,
+    date,
+    scheduleId,
+    courseId,
+  } = payload;
 
   event.waitUntil(
     (async () => {
@@ -36,7 +43,7 @@ self.addEventListener("push", (event) => {
         // One at a time, a new nudge replaces the last.
         tag: "pending-classes",
         renotify: true,
-        data: { date, scheduleId },
+        data: { date, scheduleId, courseId },
         actions: [
           { action: "confirm", title: "Happened" },
           { action: "cancel", title: "Didn't" },
@@ -49,7 +56,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   const action = event.action;
-  const { date, scheduleId } = event.notification.data ?? {};
+  const { date, scheduleId, courseId } = event.notification.data ?? {};
   event.notification.close();
 
   event.waitUntil(
@@ -63,6 +70,7 @@ self.addEventListener("notificationclick", (event) => {
             credentials: "same-origin",
             body: JSON.stringify({
               date,
+              courseId,
               scheduleId: scheduleId ?? null,
               status: action === "confirm" ? "confirmed" : "cancelled",
             }),

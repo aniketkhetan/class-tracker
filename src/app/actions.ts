@@ -22,11 +22,10 @@ function check(error: { message: string } | null) {
 
 async function resolve(formData: FormData, status: SessionStatus) {
   const scheduleIdRaw = formData.get("scheduleId");
-  const student = await requireStudent();
   const supabase = await createClient();
 
   const { error } = await supabase.rpc("resolve_class", {
-    p_student_id: student.id,
+    p_course_id: Number(formData.get("courseId")),
     p_schedule_id: scheduleIdRaw ? Number(scheduleIdRaw) : null,
     p_date: String(formData.get("date")),
     p_status: status,
@@ -47,16 +46,15 @@ export async function cancelClass(formData: FormData) {
 // Clears a whole backlog in one transaction, so it all lands or none of it does.
 export async function confirmAll(formData: FormData) {
   const rows = JSON.parse(String(formData.get("occurrences") ?? "[]")) as {
-    date: string;
+    courseId: number;
     scheduleId: number | null;
+    date: string;
   }[];
   if (rows.length === 0) return;
 
-  const student = await requireStudent();
   const supabase = await createClient();
 
   const { error } = await supabase.rpc("resolve_many", {
-    p_student_id: student.id,
     p_rows: rows,
     p_status: "confirmed",
   });
@@ -87,7 +85,7 @@ export async function addAdHocClass(formData: FormData) {
   const supabase = await createClient();
 
   const { error } = await supabase.rpc("resolve_class", {
-    p_student_id: student.id,
+    p_course_id: Number(formData.get("courseId")),
     p_schedule_id: null,
     p_date:
       String(formData.get("date") ?? "") ||
@@ -192,7 +190,8 @@ export async function createSetup(formData: FormData) {
   }
 
   const { error } = await supabase.rpc("create_setup", {
-    p_name: name,
+    p_student_name: name,
+    p_course_name: String(formData.get("courseName") ?? "").trim() || "Classes",
     p_rate_paise: ratePaise,
     p_timezone: timezone,
     p_weekdays: readWeekdays(formData),
@@ -211,12 +210,57 @@ export async function changeSchedule(formData: FormData) {
   const supabase = await createClient();
 
   const { error } = await supabase.rpc("change_schedule", {
-    p_student_id: student.id,
+    p_course_id: Number(formData.get("courseId")),
     p_weekdays: readWeekdays(formData),
     p_start_time: normalizeTime(String(formData.get("startTime") || "15:00")),
     p_from:
       String(formData.get("from") || "") ||
       localNow(new Date(), student.timezone).date,
+  });
+
+  check(error);
+  revalidatePath("/");
+}
+
+// A second thing you teach the same student, with its own schedule and rate.
+export async function addCourse(formData: FormData) {
+  const student = await requireStudent();
+  const supabase = await createClient();
+  const name = String(formData.get("name") ?? "").trim();
+  const ratePaise = parseRupeesToPaise(String(formData.get("rupees") ?? ""));
+
+  if (!name) throw new Error("Give the course a name");
+  if (ratePaise === null || ratePaise <= 0) {
+    throw new Error("Rate must be a positive number");
+  }
+
+  const { error } = await supabase.rpc("add_course", {
+    p_student_id: student.id,
+    p_name: name,
+    p_rate_paise: ratePaise,
+    p_weekdays: readWeekdays(formData),
+    p_start_time: normalizeTime(String(formData.get("startTime") || "15:00")),
+    p_from:
+      String(formData.get("from") || "") ||
+      localNow(new Date(), student.timezone).date,
+  });
+
+  check(error);
+  revalidatePath("/");
+}
+
+// Changes what you charge from now on. Past classes keep the rate they were
+// confirmed at.
+export async function setCourseRate(formData: FormData) {
+  const supabase = await createClient();
+  const ratePaise = parseRupeesToPaise(String(formData.get("rupees") ?? ""));
+  if (ratePaise === null || ratePaise <= 0) {
+    throw new Error("Rate must be a positive number");
+  }
+
+  const { error } = await supabase.rpc("set_course_rate", {
+    p_course_id: Number(formData.get("courseId")),
+    p_rate_paise: ratePaise,
   });
 
   check(error);

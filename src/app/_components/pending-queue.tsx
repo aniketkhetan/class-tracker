@@ -1,10 +1,20 @@
 import { confirmAll, cancelClass, confirmClass } from "@/app/actions";
+import type { CourseRow } from "@/lib/database.types";
 import { formatClassDate, formatTime } from "@/lib/format";
 import type { PendingOccurrence } from "@/lib/occurrences";
 
 import { buttonStyles, Card, Empty } from "./ui";
 
-export function PendingQueue({ pending }: { pending: PendingOccurrence[] }) {
+export function PendingQueue({
+  pending,
+  courses,
+}: {
+  pending: PendingOccurrence[];
+  courses: CourseRow[];
+}) {
+  const nameOf = new Map(courses.map((c) => [c.id, c.name]));
+  const showCourse = courses.length > 1;
+
   return (
     <Card
       title={pending.length ? `Unconfirmed (${pending.length})` : "Unconfirmed"}
@@ -15,7 +25,11 @@ export function PendingQueue({ pending }: { pending: PendingOccurrence[] }) {
               type="hidden"
               name="occurrences"
               value={JSON.stringify(
-                pending.map((o) => ({ date: o.date, scheduleId: o.scheduleId })),
+                pending.map((o) => ({
+                  courseId: o.courseId,
+                  scheduleId: o.scheduleId,
+                  date: o.date,
+                })),
               )}
             />
             <button className={buttonStyles.quiet} type="submit">
@@ -37,12 +51,18 @@ export function PendingQueue({ pending }: { pending: PendingOccurrence[] }) {
               <div>
                 <p className="font-medium">{formatClassDate(occurrence.date)}</p>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  {showCourse && `${nameOf.get(occurrence.courseId)} · `}
                   {formatTime(occurrence.startTime)}
                 </p>
               </div>
 
               <form className="flex gap-2">
                 <input type="hidden" name="date" value={occurrence.date} />
+                <input
+                  type="hidden"
+                  name="courseId"
+                  value={occurrence.courseId}
+                />
                 <input
                   type="hidden"
                   name="scheduleId"

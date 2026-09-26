@@ -1,12 +1,21 @@
 import { deleteSession, toggleSessionStatus } from "@/app/actions";
-import type { SessionRow } from "@/lib/database.types";
+import type { CourseRow, SessionRow } from "@/lib/database.types";
 import { formatClassDate } from "@/lib/format";
 import { formatPaise } from "@/lib/money";
 
 import { NotesField } from "./notes-field";
 import { buttonStyles, Card, Empty } from "./ui";
 
-export function SessionLog({ sessions }: { sessions: SessionRow[] }) {
+export function SessionLog({
+  sessions,
+  courses,
+}: {
+  sessions: SessionRow[];
+  courses: CourseRow[];
+}) {
+  const nameOf = new Map(courses.map((c) => [c.id, c.name]));
+  const showCourse = courses.length > 1;
+
   return (
     <Card title="Log" className="min-[900px]:flex min-[900px]:min-h-0 min-[900px]:w-full min-[900px]:flex-col">
       {sessions.length === 0 ? (
@@ -31,6 +40,7 @@ export function SessionLog({ sessions }: { sessions: SessionRow[] }) {
                       {formatClassDate(session.date)}
                     </p>
                     <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      {showCourse && `${nameOf.get(session.course_id)} · `}
                       {cancelled
                         ? "Didn't happen"
                         : formatPaise(session.rate_paise ?? 0)}

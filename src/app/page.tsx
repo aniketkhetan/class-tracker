@@ -2,7 +2,7 @@ import { signOut } from "./auth/actions";
 import { AddClass } from "./_components/add-class";
 import { BalanceCard } from "./_components/balance-card";
 import { PendingQueue } from "./_components/pending-queue";
-import { ScheduleCard } from "./_components/schedule-card";
+import { AddCourse, CourseCard } from "./_components/schedule-card";
 import { PushToggle } from "./_components/push-toggle";
 import { SessionLog } from "./_components/session-log";
 import { SetupForm } from "./_components/setup-form";
@@ -47,8 +47,16 @@ export default async function Home() {
     );
   }
 
-  const { student, pending, balance, recent, paymentHistory, activeSchedules } =
-    data;
+  const {
+    student,
+    courses,
+    pending,
+    balance,
+    earnings,
+    recent,
+    paymentHistory,
+    activeSchedules,
+  } = data;
   const today = localNow(new Date(), student.timezone).date;
 
   return (
@@ -65,15 +73,27 @@ export default async function Home() {
           </form>
         </header>
 
-        <PendingQueue pending={pending} />
-        <BalanceCard balance={balance} payments={paymentHistory} />
-        <AddClass today={today} />
-        <ScheduleCard schedules={activeSchedules} today={today} />
+        <PendingQueue pending={pending} courses={courses} />
+        <BalanceCard
+          balance={balance}
+          earnings={earnings}
+          payments={paymentHistory}
+        />
+        <AddClass today={today} courses={courses} />
+        {courses.map((course) => (
+          <CourseCard
+            key={course.id}
+            course={course}
+            schedules={activeSchedules}
+            today={today}
+          />
+        ))}
+        <AddCourse today={today} />
         <PushToggle pendingCount={pending.length} />
       </div>
 
       <div className="mt-4 min-[900px]:mt-0 min-[900px]:flex min-[900px]:min-h-0 min-[900px]:w-1/2">
-        <SessionLog sessions={recent} />
+        <SessionLog sessions={recent} courses={courses} />
       </div>
     </main>
   );

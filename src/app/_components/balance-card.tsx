@@ -1,15 +1,21 @@
 import { recordPayment } from "@/app/actions";
 import { formatClassDate } from "@/lib/format";
-import type { PaymentRow, StudentBalanceRow } from "@/lib/database.types";
+import type {
+  CourseEarningsRow,
+  PaymentRow,
+  StudentBalanceRow,
+} from "@/lib/database.types";
 import { formatPaise } from "@/lib/money";
 
 import { buttonStyles, Card, inputStyles } from "./ui";
 
 export function BalanceCard({
   balance,
+  earnings,
   payments,
 }: {
   balance: StudentBalanceRow;
+  earnings: CourseEarningsRow[];
   payments: PaymentRow[];
 }) {
   const settled = balance.owed_paise <= 0;
@@ -30,6 +36,25 @@ export function BalanceCard({
           {formatPaise(balance.earned_paise)} earned all time
         </p>
       </div>
+
+      {earnings.length > 1 && (
+        <ul className="mt-3 space-y-1 border-t border-neutral-100 pt-3 text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+          {earnings.map((course) => (
+            <li key={course.course_id} className="flex justify-between gap-3">
+              <span>
+                {course.name}
+                <span className="text-neutral-400 dark:text-neutral-600">
+                  {" "}
+                  · {course.confirmed_classes}
+                </span>
+              </span>
+              <span className="tabular-nums">
+                {formatPaise(course.earned_paise)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <form action={recordPayment} className="mt-4 flex gap-2">
         <input

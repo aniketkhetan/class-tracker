@@ -22,7 +22,7 @@ const SAT = 6;
 function rule(overrides: Partial<ScheduleRule> = {}): ScheduleRule {
   return {
     id: 1,
-    studentId: 1,
+    courseId: 1,
     weekday: TUE,
     startTime: "15:00",
     activeFrom: "2026-08-01",
@@ -82,7 +82,7 @@ describe("derivePending", () => {
   it("returns every started class, most recent first", () => {
     const pending = derivePending({
       schedules,
-      resolvedDates: [],
+      resolved: [],
       now: thursdayEvening,
       timeZone: IST,
     });
@@ -101,7 +101,7 @@ describe("derivePending", () => {
     // 08:00 UTC is 13:30 IST, two hours before the 15:00 class.
     const pending = derivePending({
       schedules,
-      resolvedDates: [],
+      resolved: [],
       now: new Date("2026-08-13T08:00:00Z"),
       timeZone: IST,
     });
@@ -115,7 +115,7 @@ describe("derivePending", () => {
     // started, even though 23:00 is still ahead of the UTC clock.
     const pending = derivePending({
       schedules: [rule({ weekday: THU, startTime: "23:00" })],
-      resolvedDates: [],
+      resolved: [],
       now: new Date("2026-08-13T18:00:00Z"),
       timeZone: IST,
     });
@@ -126,7 +126,11 @@ describe("derivePending", () => {
   it("drops dates that already have a session row", () => {
     const pending = derivePending({
       schedules,
-      resolvedDates: ["2026-08-13", "2026-08-11", "2026-08-01"],
+      resolved: [
+        { scheduleId: 2, date: "2026-08-13" }, // Thursday
+        { scheduleId: 1, date: "2026-08-11" }, // Tuesday
+        { scheduleId: 3, date: "2026-08-01" }, // Saturday
+      ],
       now: thursdayEvening,
       timeZone: IST,
     });
@@ -147,7 +151,7 @@ describe("derivePending", () => {
 
     const pending = derivePending({
       schedules: versioned,
-      resolvedDates: [],
+      resolved: [],
       now: new Date("2026-08-20T12:00:00Z"),
       timeZone: IST,
     });
@@ -164,7 +168,7 @@ describe("derivePending", () => {
   it("stops looking back past the lookback window", () => {
     const pending = derivePending({
       schedules: [rule({ weekday: TUE, activeFrom: "2026-01-01" })],
-      resolvedDates: [],
+      resolved: [],
       now: thursdayEvening,
       timeZone: IST,
       lookbackDays: 10,
@@ -177,7 +181,7 @@ describe("derivePending", () => {
   it("ignores classes before the schedule started", () => {
     const pending = derivePending({
       schedules: [rule({ weekday: TUE, activeFrom: "2026-08-10" })],
-      resolvedDates: [],
+      resolved: [],
       now: thursdayEvening,
       timeZone: IST,
     });
@@ -188,7 +192,7 @@ describe("derivePending", () => {
   it("returns nothing when the schedule has not begun", () => {
     const pending = derivePending({
       schedules: [rule({ activeFrom: "2026-09-01" })],
-      resolvedDates: [],
+      resolved: [],
       now: thursdayEvening,
       timeZone: IST,
     });
@@ -221,7 +225,7 @@ describe("a schedule change at the boundary", () => {
     // applies, and the new 17:00 has not arrived.
     const pending = derivePending({
       schedules: versioned,
-      resolvedDates: [],
+      resolved: [],
       now: new Date("2026-08-18T10:45:00Z"),
       timeZone: IST,
     });
@@ -232,7 +236,7 @@ describe("a schedule change at the boundary", () => {
   it("picks the changeover day up once the new time passes", () => {
     const pending = derivePending({
       schedules: versioned,
-      resolvedDates: [],
+      resolved: [],
       now: new Date("2026-08-18T12:00:00Z"),
       timeZone: IST,
     });
@@ -242,5 +246,53 @@ describe("a schedule change at the boundary", () => {
       "2026-08-11",
       "2026-08-04",
     ]);
+  });
+});
+
+// Two courses for the same student, both meeting on a Tuesday.
+describe("two courses on the same day", () => {
+  const maths = rule({ id: 10, courseId: 1, weekday: TUE, startTime: "15:00" });
+  const physics = rule({ id: 20, courseId: 2, weekday: TUE, startTime: "17:00" });
+  const tuesdayEvening = new Date("2026-08-11T13:00:00Z"); // 18:30 IST
+
+  it("lists both when neither is resolved", () => {
+    const pending = derivePending({
+      schedules: [maths, physics],
+      resolved: [],
+      now: tuesdayEvening,
+      timeZone: IST,
+    });
+
+    expect(
+      pending
+        .filter((o) => o.date === "2026-08-11")
+        .map((o) => o.courseId)
+        .sort(),
+    ).toEqual([1, 2]);
+  });
+
+  it("leaves the other course pending when one is confirmed", () => {
+    const pending = derivePending({
+      schedules: [maths, physics],
+      resolved: [{ scheduleId: 10, date: "2026-08-11" }],
+      now: tuesdayEvening,
+      timeZone: IST,
+    });
+
+    const onTheDay = pending.filter((o) => o.date === "2026-08-11");
+    expect(onTheDay).toHaveLength(1);
+    expect(onTheDay[0].courseId).toBe(2);
+  });
+
+  it("does not let an extra class suppress a scheduled one", () => {
+    // An ad-hoc session carries no schedule, so it resolves nothing.
+    const pending = derivePending({
+      schedules: [maths],
+      resolved: [{ scheduleId: null, date: "2026-08-11" }],
+      now: tuesdayEvening,
+      timeZone: IST,
+    });
+
+    expect(pending.map((o) => o.date)).toContain("2026-08-11");
   });
 });

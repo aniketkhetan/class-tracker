@@ -34,7 +34,7 @@ export async function isAllowed() {
   return !error && data === true;
 }
 
-// Single tutor for now, so "the student" is the first active one.
+// Single student for now, so "the student" is the first active one.
 export async function getActiveStudent() {
   const supabase = await createClient();
 
@@ -49,7 +49,22 @@ export async function getActiveStudent() {
   );
 }
 
-export async function getPending(studentId: number, timeZone: string) {
+export async function getCourses(studentId: number) {
+  const supabase = await createClient();
+
+  return unwrap(
+    await supabase
+      .from("courses")
+      .select("*")
+      .eq("student_id", studentId)
+      .is("archived_at", null)
+      .order("id"),
+  );
+}
+
+export async function getPending(courseIds: number[], timeZone: string) {
+  if (courseIds.length === 0) return [];
+
   const supabase = await createClient();
   const now = new Date();
   const { date: today } = localNow(now, timeZone);
@@ -58,24 +73,27 @@ export async function getPending(studentId: number, timeZone: string) {
   // All schedules, superseded ones included. A class from before a schedule
   // change still needs judging by the rule that applied at the time.
   const [rules, resolved] = await Promise.all([
-    supabase.from("schedules").select("*").eq("student_id", studentId),
+    supabase.from("schedules").select("*").in("course_id", courseIds),
     supabase
       .from("sessions")
-      .select("date")
-      .eq("student_id", studentId)
+      .select("schedule_id, date")
+      .in("course_id", courseIds)
       .gte("date", windowStart),
   ]);
 
   return derivePending({
     schedules: unwrap(rules).map((r) => ({
       id: r.id,
-      studentId: r.student_id,
+      courseId: r.course_id,
       weekday: r.weekday,
       startTime: r.start_time,
       activeFrom: r.active_from,
       activeUntil: r.active_until,
     })),
-    resolvedDates: unwrap(resolved).map((r) => r.date),
+    resolved: unwrap(resolved).map((r) => ({
+      scheduleId: r.schedule_id,
+      date: r.date,
+    })),
     now,
     timeZone,
     lookbackDays: LOOKBACK_DAYS,
@@ -104,14 +122,28 @@ export async function getBalance(studentId: number) {
   );
 }
 
-export async function getRecentSessions(studentId: number, limit = 30) {
+// One balance per student, broken down by what each course has earned.
+export async function getCourseEarnings(studentId: number) {
+  const supabase = await createClient();
+
+  return unwrap(
+    await supabase
+      .from("course_earnings")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("course_id"),
+  );
+}
+
+export async function getRecentSessions(courseIds: number[], limit = 30) {
+  if (courseIds.length === 0) return [];
   const supabase = await createClient();
 
   return unwrap(
     await supabase
       .from("sessions")
       .select("*")
-      .eq("student_id", studentId)
+      .in("course_id", courseIds)
       .order("date", { ascending: false })
       .order("id", { ascending: false })
       .limit(limit),
@@ -132,14 +164,15 @@ export async function getPayments(studentId: number, limit = 20) {
   );
 }
 
-export async function getActiveSchedules(studentId: number) {
+export async function getActiveSchedules(courseIds: number[]) {
+  if (courseIds.length === 0) return [];
   const supabase = await createClient();
 
   return unwrap(
     await supabase
       .from("schedules")
       .select("*")
-      .eq("student_id", studentId)
+      .in("course_id", courseIds)
       .is("active_until", null)
       .order("weekday"),
   );
@@ -149,14 +182,27 @@ export async function getDashboard() {
   const student = await getActiveStudent();
   if (!student) return null;
 
-  const [pending, balance, recent, paymentHistory, activeSchedules] =
+  const courses = await getCourses(student.id);
+  const courseIds = courses.map((c) => c.id);
+
+  const [pending, balance, earnings, recent, paymentHistory, activeSchedules] =
     await Promise.all([
-      getPending(student.id, student.timezone),
+      getPending(courseIds, student.timezone),
       getBalance(student.id),
-      getRecentSessions(student.id),
+      getCourseEarnings(student.id),
+      getRecentSessions(courseIds),
       getPayments(student.id),
-      getActiveSchedules(student.id),
+      getActiveSchedules(courseIds),
     ]);
 
-  return { student, pending, balance, recent, paymentHistory, activeSchedules };
+  return {
+    student,
+    courses,
+    pending,
+    balance,
+    earnings,
+    recent,
+    paymentHistory,
+    activeSchedules,
+  };
 }

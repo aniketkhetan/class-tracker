@@ -7,7 +7,7 @@ const DAY_MS = 86_400_000;
 
 export type ScheduleRule = {
   id: number;
-  studentId: number;
+  courseId: number;
   weekday: number; // 0 = Sunday
   startTime: string;
   activeFrom: string;
@@ -15,7 +15,7 @@ export type ScheduleRule = {
 };
 
 export type PendingOccurrence = {
-  studentId: number;
+  courseId: number;
   scheduleId: number;
   date: string;
   startTime: string;
@@ -68,9 +68,16 @@ export function weekdayOf(isoDate: string): number {
 const maxDate = (a: string, b: string) => (a > b ? a : b);
 const minDate = (a: string, b: string) => (a < b ? a : b);
 
+// Keyed by slot rather than by date. A student can be taught two courses that
+// both meet on a Tuesday, and confirming one must not make the other vanish.
+// Ad-hoc classes carry no schedule, so they suppress nothing.
+const slot = (scheduleId: number, date: string) => `${scheduleId}|${date}`;
+
+export type ResolvedSlot = { scheduleId: number | null; date: string };
+
 export type DerivePendingArgs = {
   schedules: ScheduleRule[];
-  resolvedDates: Iterable<string>;
+  resolved: Iterable<ResolvedSlot>;
   now: Date;
   timeZone: string;
   // Older classes drop off the queue instead of haunting it. They're never
@@ -82,14 +89,17 @@ export type DerivePendingArgs = {
 // Most recent first.
 export function derivePending({
   schedules,
-  resolvedDates,
+  resolved,
   now,
   timeZone,
   lookbackDays = 90,
 }: DerivePendingArgs): PendingOccurrence[] {
   const { date: today, time: nowTime } = localNow(now, timeZone);
   const windowStart = addDays(today, -lookbackDays);
-  const resolved = new Set(resolvedDates);
+  const taken = new Set<string>();
+  for (const r of resolved) {
+    if (r.scheduleId !== null) taken.add(slot(r.scheduleId, r.date));
+  }
   const found: PendingOccurrence[] = [];
 
   for (const rule of schedules) {
@@ -105,10 +115,10 @@ export function derivePending({
       date = addDays(date, 7)
     ) {
       if (date === today && startTime > nowTime) continue;
-      if (resolved.has(date)) continue;
+      if (taken.has(slot(rule.id, date))) continue;
 
       found.push({
-        studentId: rule.studentId,
+        courseId: rule.courseId,
         scheduleId: rule.id,
         date,
         startTime,

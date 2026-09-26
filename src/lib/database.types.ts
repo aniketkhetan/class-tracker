@@ -7,15 +7,23 @@ export type StudentRow = {
   id: number;
   owner_id: string;
   name: string;
-  rate_paise: number;
   timezone: string;
+  archived_at: string | null;
+  created_at: string;
+};
+
+export type CourseRow = {
+  id: number;
+  student_id: number;
+  name: string;
+  rate_paise: number;
   archived_at: string | null;
   created_at: string;
 };
 
 export type ScheduleRow = {
   id: number;
-  student_id: number;
+  course_id: number;
   weekday: number;
   start_time: string;
   active_from: string;
@@ -25,7 +33,7 @@ export type ScheduleRow = {
 
 export type SessionRow = {
   id: number;
-  student_id: number;
+  course_id: number;
   schedule_id: number | null;
   date: string;
   status: SessionStatus;
@@ -51,6 +59,15 @@ export type PushSubscriptionRow = {
   p256dh: string;
   auth: string;
   created_at: string;
+};
+
+export type CourseEarningsRow = {
+  course_id: number;
+  student_id: number;
+  name: string;
+  rate_paise: number;
+  earned_paise: number;
+  confirmed_classes: number;
 };
 
 export type StudentBalanceRow = {
@@ -80,6 +97,12 @@ export type Database = {
           "id" | "timezone" | "archived_at" | "created_at"
         >;
         Update: Partial<StudentRow>;
+        Relationships: [];
+      };
+      courses: {
+        Row: CourseRow;
+        Insert: Insertable<CourseRow, "id" | "archived_at" | "created_at">;
+        Update: Partial<CourseRow>;
         Relationships: [];
       };
       schedules: {
@@ -120,13 +143,19 @@ export type Database = {
         Row: StudentBalanceRow;
         Relationships: [];
       };
+      course_earnings: {
+        Row: CourseEarningsRow;
+        Relationships: [];
+      };
     };
     Functions: {
       is_allowed: { Args: Record<string, never>; Returns: boolean };
       owns_student: { Args: { p_student_id: number }; Returns: boolean };
+      owns_course: { Args: { p_course_id: number }; Returns: boolean };
       create_setup: {
         Args: {
-          p_name: string;
+          p_student_name: string;
+          p_course_name: string;
           p_rate_paise: number;
           p_timezone: string;
           p_weekdays: number[];
@@ -135,9 +164,24 @@ export type Database = {
         };
         Returns: number;
       };
-      change_schedule: {
+      add_course: {
         Args: {
           p_student_id: number;
+          p_name: string;
+          p_rate_paise: number;
+          p_weekdays: number[];
+          p_start_time: string;
+          p_from: string;
+        };
+        Returns: number;
+      };
+      set_course_rate: {
+        Args: { p_course_id: number; p_rate_paise: number };
+        Returns: undefined;
+      };
+      change_schedule: {
+        Args: {
+          p_course_id: number;
           p_weekdays: number[];
           p_start_time: string;
           p_from: string;
@@ -146,7 +190,7 @@ export type Database = {
       };
       resolve_class: {
         Args: {
-          p_student_id: number;
+          p_course_id: number;
           p_schedule_id: number | null;
           p_date: string;
           p_status: SessionStatus;
@@ -155,8 +199,7 @@ export type Database = {
       };
       resolve_many: {
         Args: {
-          p_student_id: number;
-          p_rows: { date: string; scheduleId: number | null }[];
+          p_rows: { courseId: number; scheduleId: number | null; date: string }[];
           p_status: SessionStatus;
         };
         Returns: number;

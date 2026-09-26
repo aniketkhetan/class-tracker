@@ -9,15 +9,26 @@ export function SetupForm() {
   return (
     <Card title="Set up">
       <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
-        Your weekly schedule. You can change it later without disturbing
-        anything already logged.
+        Your weekly schedule for one course. You can add more courses, and
+        change any of this later, without disturbing anything already logged.
       </p>
 
       <form action={createSetup} className="space-y-4">
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Student</span>
-          <input className={inputStyles} name="name" required />
-        </label>
+        <div className="flex gap-3">
+          <label className="block flex-1 space-y-1">
+            <span className="text-sm font-medium">Student</span>
+            <input className={inputStyles} name="name" required />
+          </label>
+          <label className="block flex-1 space-y-1">
+            <span className="text-sm font-medium">Course</span>
+            <input
+              className={inputStyles}
+              name="courseName"
+              placeholder="Maths"
+              required
+            />
+          </label>
+        </div>
 
         <div className="flex gap-3">
           <label className="block flex-1 space-y-1">

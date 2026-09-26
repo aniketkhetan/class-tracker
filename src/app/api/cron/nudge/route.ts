@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 
-import type { PushSubscriptionRow, StudentRow } from "@/lib/database.types";
+import type {
+  CourseRow,
+  PushSubscriptionRow,
+  StudentRow,
+} from "@/lib/database.types";
 import { formatClassDate } from "@/lib/format";
 import { addDays, derivePending, localNow } from "@/lib/occurrences";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -43,11 +47,15 @@ export async function GET(request: Request) {
   // must never reach another person's phone.
   const supabase = createAdminClient();
 
-  const [{ data: students, error: studentsError }, { data: subscriptions }] =
-    await Promise.all([
-      supabase.from("students").select("*").is("archived_at", null),
-      supabase.from("push_subscriptions").select("*"),
-    ]);
+  const [
+    { data: students, error: studentsError },
+    { data: courses },
+    { data: subscriptions },
+  ] = await Promise.all([
+    supabase.from("students").select("*").is("archived_at", null),
+    supabase.from("courses").select("*").is("archived_at", null),
+    supabase.from("push_subscriptions").select("*"),
+  ]);
 
   if (studentsError) {
     return NextResponse.json({ error: studentsError.message }, { status: 500 });
@@ -61,36 +69,55 @@ export async function GET(request: Request) {
 
   const now = new Date();
   const devicesByOwner = groupByOwner<PushSubscriptionRow>(subscriptions ?? []);
+
+  const coursesByStudent = new Map<number, CourseRow[]>();
+  for (const course of courses ?? []) {
+    const existing = coursesByStudent.get(course.student_id);
+    if (existing) existing.push(course);
+    else coursesByStudent.set(course.student_id, [course]);
+  }
   const sends: Promise<unknown>[] = [];
   const targets: PushSubscriptionRow[] = [];
   let pendingOverall = 0;
 
   for (const [ownerId, owned] of groupByOwner<StudentRow>(students ?? [])) {
     let pendingForOwner = 0;
-    let mostRecent: { date: string; scheduleId: number } | null = null;
+    let mostRecent: {
+      date: string;
+      scheduleId: number;
+      courseId: number;
+    } | null = null;
 
     for (const student of owned) {
+      const courseIds = (coursesByStudent.get(student.id) ?? []).map(
+        (c) => c.id,
+      );
+      if (courseIds.length === 0) continue;
+
       const { date: today } = localNow(now, student.timezone);
 
       const [{ data: rules }, { data: resolved }] = await Promise.all([
-        supabase.from("schedules").select("*").eq("student_id", student.id),
+        supabase.from("schedules").select("*").in("course_id", courseIds),
         supabase
           .from("sessions")
-          .select("date")
-          .eq("student_id", student.id)
+          .select("schedule_id, date")
+          .in("course_id", courseIds)
           .gte("date", addDays(today, -LOOKBACK_DAYS)),
       ]);
 
       const pending = derivePending({
         schedules: (rules ?? []).map((r) => ({
           id: r.id,
-          studentId: r.student_id,
+          courseId: r.course_id,
           weekday: r.weekday,
           startTime: r.start_time,
           activeFrom: r.active_from,
           activeUntil: r.active_until,
         })),
-        resolvedDates: (resolved ?? []).map((r) => r.date),
+        resolved: (resolved ?? []).map((r) => ({
+          scheduleId: r.schedule_id,
+          date: r.date,
+        })),
         now,
         timeZone: student.timezone,
         lookbackDays: LOOKBACK_DAYS,
@@ -99,7 +126,11 @@ export async function GET(request: Request) {
       pendingForOwner += pending.length;
       // derivePending returns most recent first.
       if (!mostRecent && pending[0]) {
-        mostRecent = { date: pending[0].date, scheduleId: pending[0].scheduleId };
+        mostRecent = {
+          date: pending[0].date,
+          scheduleId: pending[0].scheduleId,
+          courseId: pending[0].courseId,
+        };
       }
     }
 
@@ -120,6 +151,7 @@ export async function GET(request: Request) {
       pending: pendingForOwner,
       date: mostRecent?.date,
       scheduleId: mostRecent?.scheduleId,
+      courseId: mostRecent?.courseId,
     });
 
     for (const device of devices) {
