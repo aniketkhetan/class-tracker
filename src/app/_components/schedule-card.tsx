@@ -1,33 +1,72 @@
 import { addCourse, changeSchedule, setCourseRate } from "@/app/actions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { CourseRow, ScheduleRow } from "@/lib/database.types";
 import { formatTime, formatWeekday } from "@/lib/format";
 import { paiseToRupeeInput } from "@/lib/money";
 
-import { buttonStyles, Card, inputStyles } from "./ui";
+import { SubmitButton } from "./submit-button";
+import { Section } from "./ui";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 
+// Native checkboxes on purpose: they post without JavaScript, which is what
+// keeps the whole app usable as plain forms.
 function DayCheckboxes({ active }: { active: Set<number> }) {
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm font-medium">Days</legend>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {WEEKDAYS.map((day) => (
           <label
             key={day}
-            className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+            className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-checked:border-primary has-checked:bg-muted"
           >
             <input
               type="checkbox"
               name="weekdays"
               value={day}
               defaultChecked={active.has(day)}
+              className="accent-primary"
             />
             {formatWeekday(day).slice(0, 3)}
           </label>
         ))}
       </div>
     </fieldset>
+  );
+}
+
+function FromAndTime({
+  today,
+  startTime = "15:00",
+}: {
+  today: string;
+  startTime?: string;
+}) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex-1 space-y-1.5">
+        <Label htmlFor="startTime">Start time</Label>
+        <Input
+          id="startTime"
+          type="time"
+          name="startTime"
+          defaultValue={startTime}
+          required
+        />
+      </div>
+      <div className="flex-1 space-y-1.5">
+        <Label htmlFor="from">From</Label>
+        <Input
+          id="from"
+          type="date"
+          name="from"
+          defaultValue={today}
+          required
+        />
+      </div>
+    </div>
   );
 }
 
@@ -50,11 +89,11 @@ export function CourseCard({
     : "No schedule set";
 
   return (
-    <Card title={course.name}>
+    <Section title={course.name}>
       <details className="group">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
           <span className="text-sm">{summary}</span>
-          <span className={buttonStyles.quiet}>
+          <span className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             <span className="group-open:hidden">Change</span>
             <span className="hidden group-open:inline">Cancel</span>
           </span>
@@ -63,70 +102,48 @@ export function CourseCard({
         <form action={changeSchedule} className="mt-4 space-y-4">
           <input type="hidden" name="courseId" value={course.id} />
           <DayCheckboxes active={active} />
+          <FromAndTime today={today} startTime={startTime} />
 
-          <div className="flex gap-3">
-            <label className="block flex-1 space-y-1">
-              <span className="text-sm font-medium">Start time</span>
-              <input
-                className={inputStyles}
-                type="time"
-                name="startTime"
-                defaultValue={startTime}
-                required
-              />
-            </label>
-            <label className="block flex-1 space-y-1">
-              <span className="text-sm font-medium">From</span>
-              <input
-                className={inputStyles}
-                type="date"
-                name="from"
-                defaultValue={today}
-                required
-              />
-            </label>
-          </div>
-
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm text-muted-foreground">
             Classes before this date keep the old schedule. Anything already
             logged stays exactly as it is.
           </p>
 
-          <button className={`${buttonStyles.primary} w-full`} type="submit">
+          <SubmitButton className="h-10 w-full" pendingLabel="Saving">
             Save schedule
-          </button>
+          </SubmitButton>
         </form>
 
         <form action={setCourseRate} className="mt-4 flex items-end gap-2">
           <input type="hidden" name="courseId" value={course.id} />
-          <label className="block flex-1 space-y-1">
-            <span className="text-sm font-medium">Rate per class (₹)</span>
-            <input
-              className={inputStyles}
+          <div className="flex-1 space-y-1.5">
+            <Label htmlFor={`rate-${course.id}`}>Rate per class (₹)</Label>
+            <Input
+              id={`rate-${course.id}`}
               name="rupees"
               inputMode="decimal"
               defaultValue={paiseToRupeeInput(course.rate_paise)}
               required
             />
-          </label>
-          <button className={buttonStyles.reject} type="submit">
+          </div>
+          <SubmitButton variant="outline" pendingLabel="Saving">
             Save rate
-          </button>
+          </SubmitButton>
         </form>
       </details>
-    </Card>
+    </Section>
   );
 }
 
 export function AddCourse({ today }: { today: string }) {
   return (
-    <Card title="Another course">
+    <Section title="Another course">
       <details className="group">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <span className="text-sm text-neutral-500 dark:text-neutral-400">
+          <span className="text-sm text-muted-foreground">
             Teaching them something else as well?
           </span>
-          <span className={buttonStyles.quiet}>
+          <span className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             <span className="group-open:hidden">Add</span>
             <span className="hidden group-open:inline">Cancel</span>
           </span>
@@ -134,56 +151,29 @@ export function AddCourse({ today }: { today: string }) {
 
         <form action={addCourse} className="mt-4 space-y-4">
           <div className="flex gap-3">
-            <label className="block flex-1 space-y-1">
-              <span className="text-sm font-medium">Course</span>
-              <input
-                className={inputStyles}
-                name="name"
-                placeholder="Physics"
-                required
-              />
-            </label>
-            <label className="block flex-1 space-y-1">
-              <span className="text-sm font-medium">Rate per class (₹)</span>
-              <input
-                className={inputStyles}
+            <div className="flex-1 space-y-1.5">
+              <Label htmlFor="courseName">Course</Label>
+              <Input id="courseName" name="name" placeholder="Physics" required />
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <Label htmlFor="courseRate">Rate per class (₹)</Label>
+              <Input
+                id="courseRate"
                 name="rupees"
                 inputMode="decimal"
                 required
               />
-            </label>
+            </div>
           </div>
 
           <DayCheckboxes active={new Set()} />
+          <FromAndTime today={today} />
 
-          <div className="flex gap-3">
-            <label className="block flex-1 space-y-1">
-              <span className="text-sm font-medium">Start time</span>
-              <input
-                className={inputStyles}
-                type="time"
-                name="startTime"
-                defaultValue="15:00"
-                required
-              />
-            </label>
-            <label className="block flex-1 space-y-1">
-              <span className="text-sm font-medium">From</span>
-              <input
-                className={inputStyles}
-                type="date"
-                name="from"
-                defaultValue={today}
-                required
-              />
-            </label>
-          </div>
-
-          <button className={`${buttonStyles.primary} w-full`} type="submit">
+          <SubmitButton className="h-10 w-full" pendingLabel="Adding">
             Add course
-          </button>
+          </SubmitButton>
         </form>
       </details>
-    </Card>
+    </Section>
   );
 }

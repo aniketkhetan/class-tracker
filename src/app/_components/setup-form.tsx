@@ -1,66 +1,69 @@
 import { createSetup } from "@/app/actions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { formatWeekday } from "@/lib/format";
 
-import { buttonStyles, Card, inputStyles } from "./ui";
+import { SubmitButton } from "./submit-button";
+import { Section } from "./ui";
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 
 export function SetupForm() {
   return (
-    <Card title="Set up">
-      <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+    <Section title="Set up">
+      <p className="mb-4 text-sm text-muted-foreground">
         Your weekly schedule for one course. You can add more courses, and
         change any of this later, without disturbing anything already logged.
       </p>
 
       <form action={createSetup} className="space-y-4">
         <div className="flex gap-3">
-          <label className="block flex-1 space-y-1">
-            <span className="text-sm font-medium">Student</span>
-            <input className={inputStyles} name="name" required />
-          </label>
-          <label className="block flex-1 space-y-1">
-            <span className="text-sm font-medium">Course</span>
-            <input
-              className={inputStyles}
+          <div className="flex-1 space-y-1.5">
+            <Label htmlFor="name">Student</Label>
+            <Input id="name" name="name" required />
+          </div>
+          <div className="flex-1 space-y-1.5">
+            <Label htmlFor="courseName">Course</Label>
+            <Input
+              id="courseName"
               name="courseName"
               placeholder="Maths"
               required
             />
-          </label>
+          </div>
         </div>
 
         <div className="flex gap-3">
-          <label className="block flex-1 space-y-1">
-            <span className="text-sm font-medium">Rate per class (₹)</span>
-            <input
-              className={inputStyles}
-              name="rupees"
-              inputMode="decimal"
-              required
-            />
-          </label>
-          <label className="block flex-1 space-y-1">
-            <span className="text-sm font-medium">Start time</span>
-            <input
-              className={inputStyles}
+          <div className="flex-1 space-y-1.5">
+            <Label htmlFor="rupees">Rate per class (₹)</Label>
+            <Input id="rupees" name="rupees" inputMode="decimal" required />
+          </div>
+          <div className="flex-1 space-y-1.5">
+            <Label htmlFor="startTime">Start time</Label>
+            <Input
+              id="startTime"
               type="time"
               name="startTime"
               defaultValue="15:00"
               required
             />
-          </label>
+          </div>
         </div>
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Days</legend>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {WEEKDAYS.map((day) => (
               <label
                 key={day}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+                className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-checked:border-primary has-checked:bg-muted"
               >
-                <input type="checkbox" name="weekdays" value={day} />
+                <input
+                  type="checkbox"
+                  name="weekdays"
+                  value={day}
+                  className="accent-primary"
+                />
                 {formatWeekday(day).slice(0, 3)}
               </label>
             ))}
@@ -69,10 +72,10 @@ export function SetupForm() {
 
         <input type="hidden" name="timezone" value="Asia/Kolkata" />
 
-        <button className={`${buttonStyles.primary} w-full`} type="submit">
+        <SubmitButton className="h-10 w-full" pendingLabel="Setting up">
           Start tracking
-        </button>
+        </SubmitButton>
       </form>
-    </Card>
+    </Section>
   );
 }

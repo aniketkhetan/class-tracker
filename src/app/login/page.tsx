@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-import { buttonStyles, Card } from "@/app/_components/ui";
+import { Section } from "@/app/_components/ui";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -27,23 +28,19 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center p-4">
-      <Card title="Class tracker">
-        <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+      <Section title="Class tracker">
+        <p className="mb-4 text-sm text-muted-foreground">
           Sign in to confirm your classes.
         </p>
 
-        <button
-          className={`${buttonStyles.primary} w-full`}
-          onClick={signIn}
-          disabled={busy}
-        >
+        <Button className="h-10 w-full" onClick={signIn} disabled={busy}>
           {busy ? "Redirecting…" : "Continue with GitHub"}
-        </button>
+        </Button>
 
         {error && (
-          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-3 text-sm text-destructive">{error}</p>
         )}
-      </Card>
+      </Section>
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { saveNotes } from "@/app/actions";
+import { Textarea } from "@/components/ui/textarea";
 
 // Saves on blur. Never gates the confirmation, which has already happened.
 export function NotesField({
@@ -18,7 +19,7 @@ export function NotesField({
   return (
     <form action={saveNotes} ref={formRef}>
       <input type="hidden" name="sessionId" value={sessionId} />
-      <textarea
+      <Textarea
         name="notes"
         defaultValue={notes ?? ""}
         rows={2}
@@ -29,7 +30,7 @@ export function NotesField({
           setDirty(false);
           formRef.current?.requestSubmit();
         }}
-        className="mt-2 w-full resize-y rounded-lg border border-neutral-200 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-900 dark:border-neutral-800 dark:focus:border-neutral-300"
+        className="mt-2 resize-y"
       />
     </form>
   );

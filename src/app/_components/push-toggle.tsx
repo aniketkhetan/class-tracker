@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import { buttonStyles, Card } from "./ui";
+import { Button } from "@/components/ui/button";
+
+import { Section } from "./ui";
 
 // VAPID keys are base64url, PushManager wants bytes.
 function urlBase64ToUint8Array(base64: string) {
@@ -97,35 +99,35 @@ export function PushToggle({ pendingCount }: { pendingCount: number }) {
   if (state === "loading" || state === "unsupported" || !vapidKey) return null;
 
   return (
-    <Card title="Reminders">
+    <Section title="Reminders">
       {state === "on" ? (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           On. You&rsquo;ll get one nudge at 4pm on days with a class to confirm.
         </p>
       ) : state === "denied" ? (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           Notifications are blocked. Re-enable them for this site in your
           browser settings.
         </p>
       ) : state === "needs-install" ? (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           On iPhone, add this to your Home Screen first (Share, then Add to
           Home Screen). Notifications only work from the installed app.
         </p>
       ) : (
         <>
-          <p className="mb-3 text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="mb-3 text-sm text-muted-foreground">
             One nudge at 4pm, only when something needs confirming.
           </p>
-          <button
-            className={buttonStyles.primary}
+          <Button
+            className="h-10"
             onClick={enable}
             disabled={state === "busy"}
           >
             {state === "busy" ? "Enabling…" : "Turn on reminders"}
-          </button>
+          </Button>
         </>
       )}
-    </Card>
+    </Section>
   );
 }

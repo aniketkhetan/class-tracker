@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Class tracker",
@@ -28,8 +32,17 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh bg-neutral-50 text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
+      <head>
+        {/* shadcn keys dark mode off a class rather than the media query, so
+            this sets it from the system preference before first paint. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')}catch(e){}`,
+          }}
+        />
+      </head>
+      <body className="min-h-dvh bg-background text-foreground antialiased">
         {children}
       </body>
     </html>

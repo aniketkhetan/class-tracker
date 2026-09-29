@@ -1,9 +1,10 @@
-import { confirmAll, cancelClass, confirmClass } from "@/app/actions";
+import { cancelClass, confirmAll, confirmClass } from "@/app/actions";
 import type { CourseRow } from "@/lib/database.types";
 import { formatClassDate, formatTime } from "@/lib/format";
 import type { PendingOccurrence } from "@/lib/occurrences";
 
-import { buttonStyles, Card, Empty } from "./ui";
+import { SubmitButton } from "./submit-button";
+import { Empty, Section } from "./ui";
 
 export function PendingQueue({
   pending,
@@ -16,7 +17,7 @@ export function PendingQueue({
   const showCourse = courses.length > 1;
 
   return (
-    <Card
+    <Section
       title={pending.length ? `Unconfirmed (${pending.length})` : "Unconfirmed"}
       action={
         pending.length > 1 ? (
@@ -32,9 +33,9 @@ export function PendingQueue({
                 })),
               )}
             />
-            <button className={buttonStyles.quiet} type="submit">
+            <SubmitButton variant="ghost" size="sm" pendingLabel="Confirming">
               Confirm all
-            </button>
+            </SubmitButton>
           </form>
         ) : null
       }
@@ -42,21 +43,12 @@ export function PendingQueue({
       {pending.length === 0 ? (
         <Empty>Nothing to confirm. You&rsquo;re up to date.</Empty>
       ) : (
-        <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-          {pending.map((occurrence) => (
-            <li
-              key={`${occurrence.scheduleId}-${occurrence.date}`}
-              className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-            >
-              <div>
-                <p className="font-medium">{formatClassDate(occurrence.date)}</p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  {showCourse && `${nameOf.get(occurrence.courseId)} · `}
-                  {formatTime(occurrence.startTime)}
-                </p>
-              </div>
-
-              <form className="flex gap-2">
+        <ul className="divide-y">
+          {pending.map((occurrence) => {
+            // Two forms rather than one with two submit buttons, so each
+            // button gets its own pending state instead of both spinning.
+            const fields = (
+              <>
                 <input type="hidden" name="date" value={occurrence.date} />
                 <input
                   type="hidden"
@@ -68,17 +60,43 @@ export function PendingQueue({
                   name="scheduleId"
                   value={occurrence.scheduleId}
                 />
-                <button className={buttonStyles.confirm} formAction={confirmClass}>
-                  Happened
-                </button>
-                <button className={buttonStyles.reject} formAction={cancelClass}>
-                  No
-                </button>
-              </form>
-            </li>
-          ))}
+              </>
+            );
+
+            return (
+              <li
+                key={`${occurrence.scheduleId}-${occurrence.date}`}
+                className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    {formatClassDate(occurrence.date)}
+                  </p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {showCourse && `${nameOf.get(occurrence.courseId)} · `}
+                    {formatTime(occurrence.startTime)}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 gap-2">
+                  <form action={confirmClass}>
+                    {fields}
+                    <SubmitButton className="h-10 px-4" pendingLabel="Saving">
+                      Happened
+                    </SubmitButton>
+                  </form>
+                  <form action={cancelClass}>
+                    {fields}
+                    <SubmitButton variant="outline" className="h-10 px-4">
+                      No
+                    </SubmitButton>
+                  </form>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
-    </Card>
+    </Section>
   );
 }

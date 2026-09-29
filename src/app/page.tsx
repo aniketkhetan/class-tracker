@@ -6,7 +6,8 @@ import { AddCourse, CourseCard } from "./_components/schedule-card";
 import { PushToggle } from "./_components/push-toggle";
 import { SessionLog } from "./_components/session-log";
 import { SetupForm } from "./_components/setup-form";
-import { buttonStyles, Card } from "./_components/ui";
+import { Section } from "./_components/ui";
+import { Button } from "@/components/ui/button";
 
 import { localNow } from "@/lib/occurrences";
 import { getDashboard, isAllowed } from "@/lib/queries";
@@ -18,21 +19,21 @@ export default async function Home() {
   if (!(await isAllowed())) {
     return (
       <Shell>
-        <Card title="Not your dashboard">
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <Section title="Not your dashboard">
+          <p className="text-sm text-muted-foreground">
             You&rsquo;re signed in, but this account isn&rsquo;t on the
             allowlist. If this is your own copy, add your email to the{" "}
-            <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">
+            <code className="rounded bg-muted px-1">
               app_access
             </code>{" "}
             table.
           </p>
           <form action={signOut} className="mt-4">
-            <button className={buttonStyles.reject} type="submit">
+            <Button variant="outline" type="submit">
               Sign out
-            </button>
+            </Button>
           </form>
-        </Card>
+        </Section>
       </Shell>
     );
   }
@@ -67,9 +68,9 @@ export default async function Home() {
         <header className="flex items-start justify-between gap-3 px-1">
           <h1 className="text-2xl font-semibold">{student.name}</h1>
           <form action={signOut}>
-            <button className={buttonStyles.quiet} type="submit">
+            <Button variant="ghost" size="sm" type="submit">
               Sign out
-            </button>
+            </Button>
           </form>
         </header>
 

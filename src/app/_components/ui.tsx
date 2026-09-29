@@ -1,52 +1,53 @@
 import type { ReactNode } from "react";
 
-export function Card({
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+// Every panel on the dashboard is a titled card with an optional action in the
+// corner, so this wraps that shape rather than repeating it seven times.
+export function Section({
   title,
   action,
-  className = "",
+  className,
+  contentClassName,
   children,
 }: {
   title?: string;
   action?: ReactNode;
   className?: string;
+  contentClassName?: string;
   children: ReactNode;
 }) {
   return (
-    <section
-      className={`rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 ${className}`}
-    >
+    // shrink-0 because the desktop columns are fixed-height flex
+    // containers: without it the cards compress below their content and
+    // overlap each other.
+    <Card className={cn("shrink-0 gap-0 py-4", className)}>
       {(title || action) && (
-        <header className="mb-3 flex items-baseline justify-between gap-3">
+        <CardHeader className="px-4 pb-3">
           {title && (
-            <h2 className="text-sm font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
+            <CardTitle className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               {title}
-            </h2>
+            </CardTitle>
           )}
-          {action}
-        </header>
+          {action && <CardAction>{action}</CardAction>}
+        </CardHeader>
       )}
-      {children}
-    </section>
+      <CardContent className={cn("px-4", contentClassName)}>
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <p className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
-      {children}
-    </p>
+    <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>
   );
 }
-
-const base =
-  "rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50";
-
-export const buttonStyles = {
-  primary: `${base} bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200`,
-  confirm: `${base} bg-emerald-600 text-white hover:bg-emerald-500`,
-  reject: `${base} border border-neutral-300 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800`,
-  quiet: `${base} text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100`,
-};
-
-export const inputStyles =
-  "w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-300";
