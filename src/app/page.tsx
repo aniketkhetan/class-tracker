@@ -6,6 +6,7 @@ import { AddCourse, CourseCard } from "./_components/schedule-card";
 import { PushToggle } from "./_components/push-toggle";
 import { SessionLog } from "./_components/session-log";
 import { SetupForm } from "./_components/setup-form";
+import { ThemeToggle } from "./_components/theme-toggle";
 import { Section } from "./_components/ui";
 import { Button } from "@/components/ui/button";
 
@@ -67,11 +68,14 @@ export default async function Home() {
       <div className="flex flex-col gap-4 min-[900px]:min-h-0 min-[900px]:w-1/2 min-[900px]:overflow-y-auto min-[900px]:pr-1">
         <header className="flex items-start justify-between gap-3 px-1">
           <h1 className="text-2xl font-semibold">{student.name}</h1>
-          <form action={signOut}>
-            <Button variant="ghost" size="sm" type="submit">
-              Sign out
-            </Button>
-          </form>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <form action={signOut}>
+              <Button variant="ghost" size="sm" type="submit">
+                Sign out
+              </Button>
+            </form>
+          </div>
         </header>
 
         <PendingQueue pending={pending} courses={courses} />
