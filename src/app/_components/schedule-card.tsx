@@ -5,6 +5,7 @@ import type { CourseRow, ScheduleRow } from "@/lib/database.types";
 import { formatTime, formatWeekday } from "@/lib/format";
 import { paiseToRupeeInput } from "@/lib/money";
 
+import { CollapseOnDone } from "./collapse-on-done";
 import { SubmitButton } from "./submit-button";
 import { Section } from "./ui";
 
@@ -112,6 +113,7 @@ export function CourseCard({
           <SubmitButton className="h-10 w-full" pendingLabel="Saving">
             Save schedule
           </SubmitButton>
+          <CollapseOnDone />
         </form>
 
         <form action={setCourseRate} className="mt-4 flex items-end gap-2">
@@ -129,6 +131,7 @@ export function CourseCard({
           <SubmitButton variant="outline" pendingLabel="Saving">
             Save rate
           </SubmitButton>
+          <CollapseOnDone />
         </form>
       </details>
     </Section>
@@ -172,6 +175,7 @@ export function AddCourse({ today }: { today: string }) {
           <SubmitButton className="h-10 w-full" pendingLabel="Adding">
             Add course
           </SubmitButton>
+          <CollapseOnDone />
         </form>
       </details>
     </Section>
