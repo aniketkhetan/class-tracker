@@ -14,7 +14,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Classes",
-    statusBarStyle: "black-translucent",
+    // Not black-translucent: that forces white status bar text, which vanishes
+    // against a light background once you switch the theme.
+    statusBarStyle: "default",
   },
   icons: {
     icon: "/icons/icon-192.png",
@@ -23,7 +25,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -40,7 +45,15 @@ export default function RootLayout({
       className={cn("font-sans", geist.variable)}
       suppressHydrationWarning
     >
-      <body className="min-h-dvh bg-background text-foreground antialiased">
+      <body
+        className="min-h-dvh bg-background text-foreground antialiased"
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
+        }}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
