@@ -1,10 +1,8 @@
--- Money is integer paise throughout.
+
 
 create type session_status as enum ('confirmed', 'cancelled');
 
--- Sign in with GitHub means anyone with a GitHub account can sign in, so every
--- policy below checks this table. RLS on with no policies, so it's only
--- reachable from the SQL editor.
+
 create table app_access (
   email text primary key,
   note  text
